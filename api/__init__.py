@@ -1,0 +1,1 @@
+"""SentinelPay FastAPI application package."""

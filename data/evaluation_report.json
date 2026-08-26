@@ -1,0 +1,65 @@
+{
+  "parameters": {
+    "cost_per_false_alert_usd": 50.0,
+    "cost_per_missed_spike_usd": 5000.0
+  },
+  "spike_level_performance": {
+    "total_ground_truth_spikes": 4,
+    "true_positive_spikes_caught": 4,
+    "false_negative_spikes_missed": 0,
+    "spike_recall": 1.0,
+    "spike_details": [
+      {
+        "spike_id": "SPIKE-001",
+        "status": "CAUGHT",
+        "region": "North",
+        "device": "mobile",
+        "type": "TRANSFER",
+        "window": "2024-01-07 14:00:00 to 2024-01-07 18:00:00",
+        "target_rate": 0.25
+      },
+      {
+        "spike_id": "SPIKE-002",
+        "status": "CAUGHT",
+        "region": "West",
+        "device": "web",
+        "type": "CASH_OUT",
+        "window": "2024-01-09 14:00:00 to 2024-01-09 18:00:00",
+        "target_rate": 0.3
+      },
+      {
+        "spike_id": "SPIKE-003",
+        "status": "CAUGHT",
+        "region": "South",
+        "device": "pos",
+        "type": "PAYMENT",
+        "window": "2024-01-11 14:00:00 to 2024-01-11 18:00:00",
+        "target_rate": 0.2
+      },
+      {
+        "spike_id": "SPIKE-004",
+        "status": "CAUGHT",
+        "region": "East",
+        "device": "atm",
+        "type": "CASH_OUT",
+        "window": "2024-01-13 14:00:00 to 2024-01-13 18:00:00",
+        "target_rate": 0.35
+      }
+    ]
+  },
+  "alert_event_performance": {
+    "total_alert_events": 17,
+    "true_positive_alert_events": 4,
+    "false_positive_alert_events": 13,
+    "alert_precision": 0.2353,
+    "alert_f1_score": 0.381,
+    "bucket_level_false_positive_rate": 0.000411
+  },
+  "operational_financial_cost": {
+    "unmitigated_fraud_cost_usd": 20000.0,
+    "false_alert_investigation_cost_usd": 650.0,
+    "missed_spike_fraud_loss_usd": 0.0,
+    "total_system_operational_cost_usd": 650.0,
+    "net_financial_risk_prevented_usd": 19350.0
+  }
+}
