@@ -200,9 +200,9 @@ export function DashboardHome() {
               <p className="text-[10px] text-gray-500 mt-0.5">Scored HIGH / CRITICAL</p>
             </div>
             <div className="rounded-lg bg-[#0F172A] p-3 border border-[#1E293B]">
-              <span className="text-[11px] text-gray-400">Average Loss Rate</span>
-              <p className="mt-1 text-xl font-bold font-mono text-white">{data ? `${(data.average_loss_rate * 100).toFixed(1)}%` : '—'}</p>
-              <p className="text-[10px] text-gray-500 mt-0.5">Configured financial model</p>
+              <span className="text-[11px] text-gray-400">Current Risk Density</span>
+              <p className="mt-1 text-xl font-bold font-mono text-white">{data ? `${((data.current_fraud_rate ?? data.fraud_rate ?? 0) * 100).toFixed(1)}%` : '—'}</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">Rolling window average</p>
             </div>
             <div className="rounded-lg bg-[#0F172A] p-3 border border-[#1E293B]">
               <span className="text-[11px] text-gray-400">Detection Mechanism</span>
