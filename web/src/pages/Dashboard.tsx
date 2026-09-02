@@ -1199,6 +1199,8 @@ export function ModelHealthPage() {
 
   if (!data) return <EmptyState message="Loading model evaluation diagnostics..." />
 
+  const validationMetrics = data.validation_metrics ?? {}
+
   return (
     <>
       <PageHeader
@@ -1214,8 +1216,8 @@ export function ModelHealthPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         <MetricCard label="Synthetic Demo Recall" value={data.metrics.spike_recall === null ? 'Unavailable' : `${(data.metrics.spike_recall * 100).toFixed(1)}%`} subtitle="4 injected demo spikes (not the held-out benchmark - see Model Performance page)" tone="text-success" />
-        <MetricCard label="Transaction Precision" value={data.metrics.transaction_precision === null ? 'Unavailable' : `${(data.metrics.transaction_precision * 100).toFixed(1)}%`} subtitle="Chronological 80/20 classifier evaluation" tone="text-teal" />
-        <MetricCard label="Transaction Recall" value={data.metrics.transaction_recall === null ? 'Unavailable' : `${(data.metrics.transaction_recall * 100).toFixed(1)}%`} subtitle="Chronological 80/20 classifier evaluation" tone="text-teal" />
+        <MetricCard label="Transaction Precision" value={data.metrics.transaction_precision === null ? 'Unavailable' : `${(data.metrics.transaction_precision * 100).toFixed(1)}%`} subtitle="Chronological 60/20/20 classifier evaluation" tone="text-teal" />
+        <MetricCard label="Transaction Recall" value={data.metrics.transaction_recall === null ? 'Unavailable' : `${(data.metrics.transaction_recall * 100).toFixed(1)}%`} subtitle="Chronological 60/20/20 classifier evaluation" tone="text-teal" />
         <MetricCard label="Held-Out Test Set" value={data.held_out_test_size === null ? 'Unavailable' : data.held_out_test_size.toLocaleString()} subtitle="Held-out transaction classifier slice" tone="text-white" />
       </div>
 
@@ -1244,7 +1246,7 @@ export function ModelHealthPage() {
                 { key: 'alert_precision', label: 'Alert Precision' },
                 { key: 'alert_f1_score', label: 'Alert F1 Score' },
                 { key: 'bucket_fpr', label: 'Bucket FPR' },
-              ] as const).map((row) => <tr key={row.key}><td className="py-2 font-sans text-gray-400">{row.label}</td><td>{row.key in data.validation_metrics && data.validation_metrics[row.key as keyof typeof data.validation_metrics] !== null ? data.validation_metrics[row.key as keyof typeof data.validation_metrics]?.toFixed(4) : 'Unavailable'}</td><td className="text-teal font-bold">{data.metrics[row.key] === null ? 'Unavailable' : data.metrics[row.key]?.toFixed(4)}</td></tr>)}
+              ] as const).map((row) => <tr key={row.key}><td className="py-2 font-sans text-gray-400">{row.label}</td><td>{row.key in validationMetrics && validationMetrics[row.key as keyof typeof validationMetrics] !== null ? validationMetrics[row.key as keyof typeof validationMetrics]?.toFixed(4) : 'Unavailable'}</td><td className="text-teal font-bold">{data.metrics[row.key] === null ? 'Unavailable' : data.metrics[row.key]?.toFixed(4)}</td></tr>)}
             </tbody>
           </table>
         </div>
