@@ -50,28 +50,85 @@ def generate_structured_investigation(
     sorted_methods = sorted(top_methods.items(), key=lambda x: x[1], reverse=True)
     primary_method = sorted_methods[0][0] if sorted_methods else "card"
 
-    evidence_items = [
-        f"EVID-001: Observed fraud risk density of {density*100:.2f}% vs baseline of {baseline*100:.2f}%",
-        f"EVID-002: Statistical significance test yielded Z-Score of {z_score:.1f}σ (Multiplier: {multiplier:.1f}x)",
-        f"EVID-003: Volume concentration of {affected_count} transactions with estimated exposure ₹{exposure:,.0f}",
-        f"EVID-004: Primary payment vector concentrated on {primary_method.upper()} payment rails",
-    ]
+    # Extract top SHAP feature contributions from incident or related transactions
+    shap_contributions = []
+    try:
+        raw_root = incident.get("root_cause_json")
+        if isinstance(raw_root, str):
+            shap_contributions = json.loads(raw_root or "[]")
+        elif isinstance(raw_root, list):
+            shap_contributions = raw_root
+    except Exception:
+        shap_contributions = []
 
-    confidence = "HIGH" if z_score >= 5.0 and affected_count >= 10 else ("MEDIUM" if z_score >= 3.0 else "LOW")
+    if not shap_contributions:
+        for tx in related_transactions:
+            expl = tx.get("explanation")
+            if expl and isinstance(expl, list) and len(expl) > 0:
+                shap_contributions = expl
+                break
+
+    is_ring = str(incident.get("alert_id", "")).startswith("RING-") or incident.get("incident_type") == "RING"
+
+    if is_ring:
+        evidence_items = [
+            f"EVID-001: Connected graph component of {affected_count} coordinated transactions detected",
+            f"EVID-002: Temporal proximity clustering within tight 30-minute velocity window",
+            f"EVID-003: Coordinated payment vector concentrated on {primary_method.upper()} payment rails",
+            f"EVID-004: Clustered transaction amounts totaling potential exposure of ₹{exposure:,.0f}",
+        ]
+    else:
+        evidence_items = [
+            f"EVID-001: Observed fraud risk density of {density*100:.2f}% vs baseline of {baseline*100:.2f}%",
+            f"EVID-002: Statistical significance test yielded Z-Score of {z_score:.1f}σ (Multiplier: {multiplier:.1f}x)",
+            f"EVID-003: Volume concentration of {affected_count} transactions with estimated exposure ₹{exposure:,.0f}",
+            f"EVID-004: Primary payment vector concentrated on {primary_method.upper()} payment rails",
+        ]
+
+    # Surface SHAP feature attributions in EVID-005
+    if shap_contributions:
+        shap_parts = []
+        for item in shap_contributions[:3]:
+            feat = item.get("feature", "")
+            contrib = item.get("contribution", 0.0)
+            sign = "+" if contrib > 0 else ""
+            shap_parts.append(f"{feat} ({sign}{contrib:.2f})")
+        if shap_parts:
+            evidence_items.append(f"EVID-005: SHAP Risk Drivers: {', '.join(shap_parts)}")
+
+    confidence = "HIGH" if (z_score >= 5.0 or is_ring) and affected_count >= 4 else ("MEDIUM" if z_score >= 3.0 else "LOW")
     recommended = "CONFIRM_FRAUD" if confidence == "HIGH" else "REQUEST_MANUAL_REVIEW"
 
     # Deterministic evidence synthesis (or LLM enhancement when configured)
-    investigation = {
-        "incident_summary": (
+    summary_text = (
+        f"Graph-connected abuse ring detected on {incident.get('source', 'LIVE')} stream: "
+        f"cluster of {affected_count} coordinated transactions sharing {primary_method.upper()} payment rails "
+        f"and tightly clustered amounts. Total exposure: ₹{exposure:,.0f}."
+        if is_ring
+        else (
             f"Statistically abnormal fraud density surge detected on {incident.get('source', 'LIVE')} stream. "
             f"Current risk density is {density*100:.2f}% compared to historical baseline of {baseline*100:.2f}% "
             f"({multiplier:.1f}x normal, Z={z_score:.1f}σ). Estimated exposure: ₹{exposure:,.0f} across {affected_count} transactions."
-        ),
-        "likely_drivers": [
+        )
+    )
+
+    drivers = (
+        [
+            f"Coordinated {primary_method.upper()} velocity cluster spanning multiple accounts/cards",
+            "High amount similarity and synchronicity indicating automated ring behavior",
+            "Graph connected-component density exceeding anomaly threshold",
+        ]
+        if is_ring
+        else [
             f"Concentrated {primary_method.upper()} transaction velocity exceeding standard variance",
             "Anomalous high-value payment clustering outside regular merchant baseline windows",
             "Elevated XGBoost model fraud probability density in target hourly window",
-        ],
+        ]
+    )
+
+    investigation = {
+        "incident_summary": summary_text,
+        "likely_drivers": drivers,
         "evidence": evidence_items,
         "uncertainties": [
             "Merchant seasonal promotion calendar unconfirmed",
@@ -79,7 +136,8 @@ def generate_structured_investigation(
         ],
         "recommended_action": recommended,
         "confidence": confidence,
-        "evidence_ids": ["EVID-001", "EVID-002", "EVID-003", "EVID-004"],
+        "evidence_ids": [f"EVID-00{i+1}" for i in range(len(evidence_items))],
+        "shap_explanations": shap_contributions[:3],
         "ai_provider": "gemini-pro" if api_key else "offline_deterministic_fallback",
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }

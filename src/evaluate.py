@@ -19,8 +19,8 @@ COST_PER_MISSED_SPIKE = 5000.0     # $5,000 unchecked fraud ring damage per miss
 SEGMENT_COLUMNS = ["region", "device", "type"]
 
 
-def _classifier_metrics(scored_path: Path, train_ratio: float = 0.8) -> dict:
-    """Measure classifier metrics on the chronological held-out suffix only."""
+def _classifier_metrics(scored_path: Path, train_ratio: float = 0.6, validation_ratio: float = 0.2) -> dict:
+    """Measure classifier metrics on chronological validation and held-out slices."""
     if not scored_path.exists():
         return {"status": "UNAVAILABLE", "reason": "Scored classifier artifact not found."}
     required = {"timestamp", "isFraud", "fraud_prob"}
@@ -29,17 +29,30 @@ def _classifier_metrics(scored_path: Path, train_ratio: float = 0.8) -> dict:
         return {"status": "UNAVAILABLE", "reason": "Scored artifact lacks isFraud, fraud_prob, or timestamp."}
     frame["timestamp"] = pd.to_datetime(frame["timestamp"])
     frame = frame.sort_values("timestamp", kind="stable").reset_index(drop=True)
-    split = int(len(frame) * train_ratio)
-    held_out = frame.iloc[split:]
-    if held_out.empty or held_out["isFraud"].nunique() < 2:
+    train_end = int(len(frame) * train_ratio)
+    validation_end = int(len(frame) * (train_ratio + validation_ratio))
+    validation = frame.iloc[train_end:validation_end]
+    held_out = frame.iloc[validation_end:]
+    if validation.empty or held_out.empty or validation["isFraud"].nunique() < 2 or held_out["isFraud"].nunique() < 2:
         return {"status": "UNAVAILABLE", "reason": "Held-out slice is empty or has one class."}
+    validation_predictions = (validation["fraud_prob"] >= 0.5).astype(int)
     predictions = (held_out["fraud_prob"] >= 0.5).astype(int)
     negatives = int((held_out["isFraud"] == 0).sum())
     false_positives = int(((predictions == 1) & (held_out["isFraud"] == 0)).sum())
+    validation_negatives = int((validation["isFraud"] == 0).sum())
+    validation_false_positives = int(((validation_predictions == 1) & (validation["isFraud"] == 0)).sum())
     return {
         "status": "MEASURED",
-        "method": "Chronological 80/20 suffix; threshold 0.50",
-        "train_size": split,
+        "method": "Chronological 60/20/20 split; threshold 0.50",
+        "train_size": train_end,
+        "validation": {
+            "validation_size": len(validation),
+            "fraud_count": int(validation["isFraud"].sum()),
+            "precision": float(precision_score(validation["isFraud"], validation_predictions, zero_division=0)),
+            "recall": float(recall_score(validation["isFraud"], validation_predictions, zero_division=0)),
+            "f1": float(f1_score(validation["isFraud"], validation_predictions, zero_division=0)),
+            "false_positive_rate": validation_false_positives / validation_negatives if validation_negatives else 0.0,
+        },
         "held_out_test_size": len(held_out),
         "fraud_count": int(held_out["isFraud"].sum()),
         "precision": float(precision_score(held_out["isFraud"], predictions, zero_division=0)),

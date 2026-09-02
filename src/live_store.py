@@ -327,20 +327,32 @@ class LiveStore:
                     (key, val),
                 )
 
-            # Seed default admin user if no admin exists
+            # Seed default admin and team users if no admin exists
             admin_count = int(conn.execute("SELECT COUNT(*) FROM users WHERE role IN ('Merchant Admin', 'ADMIN') AND status = 'ACTIVE' AND deleted_at IS NULL").fetchone()[0])
             if admin_count == 0:
+                clean_team = [
+                    ("USER_ADMIN", "System Administrator", "admin@sentinelpay.internal", "Merchant Admin", hash_password("AdminSecurePassword123!"), "SentinelPay Platform", "ACTIVE", 1),
+                    ("USER_KEERTHANA", "Keerthana R.", "keerthana@sentinelpay.internal", "Risk Analyst", hash_password("KeerthanaSecure123!"), "Risk Operations Desk", "ACTIVE", 1),
+                    ("USER_FINANCE", "Cyrus V.", "finance@sentinelpay.internal", "Finance Manager", hash_password("FinanceSecure123!"), "Merchant Finance Desk", "ACTIVE", 1),
+                    ("USER_OPS", "Priya Sharma", "operations@sentinelpay.internal", "Operations Manager", hash_password("OpsSecure123!"), "Merchant Operations", "ACTIVE", 1),
+                ]
+                for uid, name, email, role, pwd, org, status, ver in clean_team:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO users(user_id, name, email, role, password_hash, organization, terms_accepted, status, email_verified, created_via) "
+                        "VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, 'BOOTSTRAP')",
+                        (uid, name, email, role, pwd, org, status, ver),
+                    )
+
+            # Seed default notification recipient if empty
+            rec_count = int(conn.execute("SELECT COUNT(*) FROM notification_recipients").fetchone()[0])
+            if rec_count == 0:
                 conn.execute(
-                    "INSERT OR IGNORE INTO users(user_id, name, email, role, password_hash, organization, terms_accepted, status, email_verified, created_via) "
-                    "VALUES (?, ?, ?, ?, ?, ?, 1, 'ACTIVE', 1, 'BOOTSTRAP')",
-                    (
-                        "USER_ADMIN",
-                        "System Administrator",
-                        "admin@sentinelpay.internal",
-                        "Merchant Admin",
-                        hash_password("AdminSecurePassword123!"),
-                        "SentinelPay Platform",
-                    ),
+                    "INSERT OR IGNORE INTO notification_recipients(name, email, role, enabled) "
+                    "VALUES ('Risk Operations Desk', 'security@sentinelpay.internal', 'Security Operations', 1)"
+                )
+                conn.execute(
+                    "INSERT OR IGNORE INTO notification_recipients(name, email, role, enabled) "
+                    "VALUES ('Keerthana R. (Lead Analyst)', 'keerthana@sentinelpay.internal', 'Risk Analyst', 1)"
                 )
 
     # -------------------------------------------------------------------------

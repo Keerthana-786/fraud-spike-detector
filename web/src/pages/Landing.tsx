@@ -43,38 +43,87 @@ export function LandingPage() {
   return (
     <div>
       <MarketingNav />
-      <section className="bg-gradient-to-b from-sky-50 to-white">
+      <section className="bg-[#0B1020] text-white">
         <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 md:grid-cols-2 md:py-24">
           <div>
-            <h1 className="text-4xl font-extrabold leading-tight md:text-6xl">Detect Fraud Spikes Before Losses Grow</h1>
-            <p className="mt-5 text-lg text-gray-600 md:text-xl">
-              Stop losing money to coordinated fraud attacks. SentinelPay detects sudden changes in your fraud
-              behavior in real time and alerts your team — without blocking payments.
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#3B82F6]/30 bg-[#3B82F6]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#93C5FD]">
+              <Shield size={14} /> AI Finance Controller
+            </div>
+            <h1 className="text-4xl font-extrabold leading-tight md:text-6xl">Take Control of Your Financial Risk with AI</h1>
+            <p className="mt-5 max-w-xl text-lg text-slate-300 md:text-xl">
+              AI Finance Controller continuously monitors transactions, identifies suspicious financial activity,
+              calculates risk scores, and delivers actionable insights to help businesses make safer decisions.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/signup" className="btn-primary">
-                Get Started Free
+              <Link to="/dashboard" className="btn-primary">
+                Open Dashboard
               </Link>
-              <a href="#how-it-works" className="btn-outline">
-                Watch Demo Video
-              </a>
+              <Link to="/dashboard/simulator" className="btn-outline !border-slate-600 !text-slate-100 hover:bg-slate-800/80">
+                View Demo Data
+              </Link>
             </div>
-            <p className="mt-4 text-sm text-gray-500">15-minute setup · No credit card required</p>
+            <div className="mt-6 flex flex-wrap gap-4 text-sm text-slate-300">
+              <span>• Real-time transaction monitoring</span>
+              <span>• Risk scoring and anomaly detection</span>
+              <span>• Actionable recommendations</span>
+            </div>
           </div>
-          <div className="card">
-            <p className="text-sm font-medium text-gray-500">Fraud rate · sample merchant day</p>
+          <div className="rounded-2xl border border-slate-700 bg-slate-950/80 p-5 shadow-2xl shadow-slate-950/30">
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-300">Risk Overview</p>
+              <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-rose-300">
+                Critical
+              </span>
+            </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={spike}>
-                  <XAxis dataKey="t" />
-                  <YAxis unit="%" />
-                  <Tooltip />
-                  <Area type="monotone" dataKey="rate" stroke="#DC2626" fill="#FECACA" />
+                  <XAxis dataKey="t" stroke="#94A3B8" />
+                  <YAxis unit="%" stroke="#94A3B8" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#0F172A',
+                      border: '1px solid #334155',
+                      borderRadius: '12px',
+                      color: '#E2E8F0',
+                    }}
+                  />
+                  <Area type="monotone" dataKey="rate" stroke="#F87171" fill="#FECACA" fillOpacity={0.35} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <p className="mt-2 text-sm text-critical">0.5% baseline → 7.5% spike (15×)</p>
+            <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/80 p-3 text-sm">
+              <span className="text-slate-300">Fraud baseline</span>
+              <span className="font-semibold text-slate-100">0.5%</span>
+              <span className="text-rose-300">→ 7.5% spike</span>
+            </div>
           </div>
+        </div>
+      </section>
+
+      <section id="how-it-works" className="mx-auto max-w-6xl px-4 py-16">
+        <div className="mb-8 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-400">Workflow</p>
+          <h2 className="mt-3 text-3xl font-bold text-slate-900 md:text-4xl">From transaction data to confident action</h2>
+        </div>
+        <div className="grid gap-4 md:grid-cols-5">
+          {[
+            'Transaction Data',
+            'AI Risk Analysis',
+            'Risk Score & Detection',
+            'Alerts & Insights',
+            'Recommended Action',
+          ].map((item, index) => (
+            <div key={item} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sm font-bold text-sky-700">
+                {index + 1}
+              </div>
+              <p className="text-sm font-semibold text-slate-800">{item}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-6 flex items-center justify-center text-slate-500">
+          <span className="mx-2">↓</span>
         </div>
       </section>
 

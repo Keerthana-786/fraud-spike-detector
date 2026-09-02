@@ -100,8 +100,40 @@ def inject_controlled_spike(store: LiveStore | None = None) -> list[dict]:
     return results
 
 
+def inject_abuse_ring(store: LiveStore | None = None) -> list[dict]:
+    """Inject a coordinated attack ring sharing payment method, tight time proximity, and similar amounts."""
+    store = store or LiveStore()
+    store.save_user("USER_ADMIN", "System Administrator", "admin@sentinelpay.internal", role="Merchant Admin")
+    results = []
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    target_method = "card"
+    base_amount = 7490.00
+
+    # Inject 8 coordinated transactions in rapid succession with slightly jittered amounts
+    for i in range(8):
+        jittered_amt = round(base_amount + random.uniform(-150.0, 150.0), 2)
+        tx = _transaction(
+            now - timedelta(seconds=(8 - i) * 35),
+            jittered_amt,
+            target_method,
+            "coordinated_abuse_ring",
+            f"ORD-RING-{uuid.uuid4().hex[:8].upper()}",
+        )
+        res = _process_controlled(tx, store)
+        results.append(res)
+
+    # Run graph ring detection over the newly ingested transactions
+    from src.abuse_ring import run_abuse_ring_pipeline
+    run_abuse_ring_pipeline(store=store, min_ring_size=4)
+
+    store.record_audit(None, "Injected coordinated abuse ring simulation (8 transactions)", actor="Demo Controller")
+    return results
+
+
 def stop_simulation(store: LiveStore | None = None) -> dict:
     """Clear simulation stream."""
     store = store or LiveStore()
     store.clear_simulator_data()
     return {"status": "cleared", "message": "Simulation data cleared successfully"}
+

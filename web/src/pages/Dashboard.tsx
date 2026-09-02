@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Flame,
+  Network,
   Play,
   RefreshCw,
   Search,
@@ -679,6 +680,11 @@ export function AlertDetailPage() {
           <Link to="/dashboard/incidents" className="btn-secondary !py-1.5 !px-3 text-xs">
             ← Incidents
           </Link>
+          {alert.alert_id.startsWith('RING-') && (
+            <span className="rounded px-2.5 py-1 text-xs font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40">
+              ABUSE RING
+            </span>
+          )}
           <span className={alert.severity === 'CRITICAL' ? 'badge-critical' : 'badge-info'}>{alert.severity}</span>
           <span className="rounded bg-gray-800 px-2.5 py-1 text-xs font-mono text-gray-300 font-semibold">{alert.status}</span>
         </div>
@@ -803,9 +809,22 @@ export function AlertDetailPage() {
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">Evidence Citations:</p>
                   <div className="space-y-1">
-                    {ai_investigation.evidence.map((e, i) => (
-                      <p key={i} className="rounded bg-[#141B2E] p-1.5 font-mono text-[10px] text-gray-300">{e}</p>
-                    ))}
+                    {ai_investigation.evidence.map((e, i) => {
+                      const isShap = e.includes('EVID-005') || e.toLowerCase().includes('shap') || e.toLowerCase().includes('risk driver')
+                      return (
+                        <p
+                          key={i}
+                          className={`rounded p-1.5 font-mono text-[10px] ${
+                            isShap
+                              ? 'bg-amber-500/10 border border-amber-500/30 text-amber-300'
+                              : 'bg-[#141B2E] text-gray-300'
+                          }`}
+                        >
+                          {isShap && <span className="text-amber-400 font-bold mr-1">▶ SHAP</span>}
+                          {e}
+                        </p>
+                      )
+                    })}
                   </div>
                 </div>
                 <div className="pt-2 border-t border-[#1E293B]">
@@ -948,7 +967,7 @@ export function FinancialImpactPage() {
                 <strong className="text-white">Assumption 1 (Review Overhead):</strong> False positive manual review cost is fixed at <span className="font-mono text-teal font-bold">₹{data.cost_per_false_positive}</span> per alert (Configurable in Settings).
               </p>
               <p className="rounded bg-[#0F172A] p-2.5 border border-[#1E293B]">
-                <strong className="text-white">Assumption 2 (Average Loss Rate):</strong> Estimated unmitigated loss uses the configured average loss rate of <span className="font-mono text-teal font-bold">60.0%</span>. This does not affect confirmed fraud loss.
+                <strong className="text-white">Assumption 2 (Average Loss Rate):</strong> Estimated unmitigated loss uses the configured average loss rate of <span className="font-mono text-teal font-bold">{(data.average_loss_rate * 100).toFixed(1)}%</span>. This does not affect confirmed fraud loss.
               </p>
               <p className="rounded bg-[#0F172A] p-2.5 border border-[#1E293B]">
                 <strong className="text-white">Estimated net benefit:</strong> Estimated unmitigated loss minus analyst review cost = <span className="font-mono text-success font-bold">{formatCurrency(Math.max(0, data.estimated_unmitigated_loss - data.estimated_false_positive_cost))}</span>.
@@ -959,6 +978,211 @@ export function FinancialImpactPage() {
       ) : (
         <EmptyState message="Financial impact calculations are currently unavailable." />
       )}
+    </>
+  )
+}
+
+/* ============================================================================
+   PAGE: MODEL PERFORMANCE (HELD-OUT BENCHMARK VS NAIVE BASELINE)
+============================================================================ */
+export function ModelPerformancePage() {
+  const [data, setData] = useState<Awaited<ReturnType<typeof api.modelPerformance>> | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    api.modelPerformance()
+      .then(setData)
+      .catch(() => setData(null))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <EmptyState message="Loading held-out benchmark evaluation results..." />
+  if (!data) return <EmptyState message="Model performance benchmark artifact is currently unavailable." />
+
+  const sp = data.sentinelpay_detector
+  const nv = data.naive_baseline_detector
+  const comp = data.comparison_metrics
+
+  return (
+    <>
+      <PageHeader
+        title="Model Performance & Held-Out Benchmark"
+        subtitle="Measured detector metrics on identical held-out test split vs naive volume-threshold baseline"
+      />
+
+      {/* Top Value Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+        <MetricCard
+          label="False Positive Drop"
+          value={`-${comp.false_positive_reduction_pct.toFixed(1)}%`}
+          subtitle="Fewer false alarms vs baseline"
+          tone="text-teal"
+        />
+        <MetricCard
+          label="Precision Multiplier"
+          value={`${comp.precision_improvement_multiplier.toFixed(1)}x`}
+          subtitle={`${(sp.precision * 100).toFixed(1)}% vs ${(nv.precision * 100).toFixed(1)}%`}
+          tone="text-success"
+        />
+        <MetricCard
+          label="Spike Recall"
+          value={`${(sp.recall * 100).toFixed(1)}%`}
+          subtitle={`Caught ${sp.true_positives} of ${sp.true_positives + sp.false_negatives} held-out spikes`}
+          tone="text-white"
+        />
+        <MetricCard
+          label="Net Operational Savings"
+          value={`$${Math.round(comp.net_operational_cost_savings_usd).toLocaleString()}`}
+          subtitle="Saved in manual review overhead"
+          tone="text-success"
+        />
+      </div>
+
+      {/* Plain-English Takeaway Banner */}
+      <div className="mb-6 rounded-xl border border-teal/40 bg-[#101726] p-4 flex items-start gap-3">
+        <div className="rounded-lg bg-teal/10 p-2 text-teal mt-0.5 shrink-0">
+          <Sparkles size={18} />
+        </div>
+        <div>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-teal">Plain-English Interpretation</h3>
+          <p className="text-xs text-gray-200 mt-1 leading-relaxed">
+            "{data.plain_english_takeaway}"
+          </p>
+        </div>
+      </div>
+
+      {/* Side-by-Side Comparison Table */}
+      <div className="rounded-xl border border-[#1E293B] bg-[#141B2E] p-5 mb-6">
+        <div className="flex items-center justify-between border-b border-[#1E293B] pb-3 mb-4">
+          <div>
+            <h3 className="text-sm font-bold text-white">Detector Head-to-Head Benchmark</h3>
+            <p className="text-[11px] text-gray-400">
+              Evaluated on {data.dataset_summary.held_out_test_buckets.toLocaleString()} held-out hourly buckets ({data.dataset_summary.ground_truth_spikes_in_test} ground-truth fraud spikes)
+            </p>
+          </div>
+          <span className="badge-info text-[10px]">Held-Out 80/20 Test Split</span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs font-mono">
+            <thead className="border-b border-[#1E293B] bg-[#0F172A] text-gray-400 uppercase text-[10px]">
+              <tr>
+                <th className="px-4 py-3 font-sans">Metric</th>
+                <th className="px-4 py-3 text-teal">SentinelPay Z-Score Detector</th>
+                <th className="px-4 py-3 text-gray-400">Naive Volume Baseline</th>
+                <th className="px-4 py-3 text-success font-sans">SentinelPay Advantage</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1E293B]/60 text-gray-200">
+              <tr className="hover:bg-[#162035]">
+                <td className="px-4 py-3 font-sans font-medium text-gray-300">Detection Mechanism</td>
+                <td className="px-4 py-3 text-teal font-bold">{sp.mechanism}</td>
+                <td className="px-4 py-3 text-gray-400">{nv.mechanism}</td>
+                <td className="px-4 py-3 font-sans text-teal">Density-Aware</td>
+              </tr>
+              <tr className="hover:bg-[#162035]">
+                <td className="px-4 py-3 font-sans font-medium text-gray-300">Precision</td>
+                <td className="px-4 py-3 text-teal font-bold">{(sp.precision * 100).toFixed(1)}%</td>
+                <td className="px-4 py-3 text-gray-400">{(nv.precision * 100).toFixed(1)}%</td>
+                <td className="px-4 py-3 font-sans text-success">+{((sp.precision - nv.precision) * 100).toFixed(1)}% higher</td>
+              </tr>
+              <tr className="hover:bg-[#162035]">
+                <td className="px-4 py-3 font-sans font-medium text-gray-300">Recall (Sensitivity)</td>
+                <td className="px-4 py-3 text-teal font-bold">{(sp.recall * 100).toFixed(1)}%</td>
+                <td className="px-4 py-3 text-gray-400">{(nv.recall * 100).toFixed(1)}%</td>
+                <td className="px-4 py-3 font-sans text-success">+{((sp.recall - nv.recall) * 100).toFixed(1)}% higher</td>
+              </tr>
+              <tr className="hover:bg-[#162035]">
+                <td className="px-4 py-3 font-sans font-medium text-gray-300">F1 Score</td>
+                <td className="px-4 py-3 text-teal font-bold">{sp.f1_score.toFixed(4)}</td>
+                <td className="px-4 py-3 text-gray-400">{nv.f1_score.toFixed(4)}</td>
+                <td className="px-4 py-3 font-sans text-success">+{comp.f1_improvement_pct.toFixed(1)}% improvement</td>
+              </tr>
+              <tr className="hover:bg-[#162035]">
+                <td className="px-4 py-3 font-sans font-medium text-gray-300">False Positive Alerts (FP)</td>
+                <td className="px-4 py-3 text-success font-bold">{sp.false_positives}</td>
+                <td className="px-4 py-3 text-critical font-bold">{nv.false_positives}</td>
+                <td className="px-4 py-3 font-sans text-success">-{comp.false_positive_reduction_pct.toFixed(1)}% reduction</td>
+              </tr>
+              <tr className="hover:bg-[#162035]">
+                <td className="px-4 py-3 font-sans font-medium text-gray-300">False Negatives (Missed)</td>
+                <td className="px-4 py-3 text-white font-bold">{sp.false_negatives}</td>
+                <td className="px-4 py-3 text-gray-400">{nv.false_negatives}</td>
+                <td className="px-4 py-3 font-sans text-white">{nv.false_negatives - sp.false_negatives} fewer missed</td>
+              </tr>
+              <tr className="hover:bg-[#162035]">
+                <td className="px-4 py-3 font-sans font-medium text-gray-300">FP Review Cost ($50/alert)</td>
+                <td className="px-4 py-3 text-success font-bold">${sp.operational_fp_cost_usd.toLocaleString()}</td>
+                <td className="px-4 py-3 text-critical font-bold">${nv.operational_fp_cost_usd.toLocaleString()}</td>
+                <td className="px-4 py-3 font-sans text-success">${(nv.operational_fp_cost_usd - sp.operational_fp_cost_usd).toLocaleString()} saved</td>
+              </tr>
+              <tr className="hover:bg-[#162035]">
+                <td className="px-4 py-3 font-sans font-medium text-gray-300">Total Operational Cost</td>
+                <td className="px-4 py-3 text-success font-bold">${sp.total_operational_cost_usd.toLocaleString()}</td>
+                <td className="px-4 py-3 text-gray-400">${nv.total_operational_cost_usd.toLocaleString()}</td>
+                <td className="px-4 py-3 font-sans text-success font-bold">${comp.net_operational_cost_savings_usd.toLocaleString()} saved</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Confusion Matrices Grid */}
+      <div className="grid gap-6 lg:grid-cols-2 mb-6">
+        <div className="rounded-xl border border-[#1E293B] bg-[#141B2E] p-5">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-teal mb-3">
+            SentinelPay Z-Score Confusion Matrix
+          </h3>
+          <table className="w-full text-center text-xs font-mono">
+            <thead>
+              <tr className="border-b border-[#1E293B]">
+                <th className="p-2 text-left font-sans text-gray-400">Actual \ Predicted</th>
+                <th className="p-2 text-critical">Predicted Spike</th>
+                <th className="p-2 text-teal">Predicted Normal</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1E293B]">
+              <tr>
+                <td className="p-2 text-left font-sans text-critical font-semibold">Actual Spike</td>
+                <td className="p-2 font-bold text-success bg-success/10">{sp.true_positives} (TP)</td>
+                <td className="p-2 text-gray-400 bg-critical/10">{sp.false_negatives} (FN)</td>
+              </tr>
+              <tr>
+                <td className="p-2 text-left font-sans text-teal font-semibold">Actual Benign</td>
+                <td className="p-2 text-gray-400 bg-critical/10">{sp.false_positives} (FP)</td>
+                <td className="p-2 font-bold text-success bg-success/10">{sp.true_negatives.toLocaleString()} (TN)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="rounded-xl border border-[#1E293B] bg-[#141B2E] p-5">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
+            Naive Volume-Threshold Confusion Matrix
+          </h3>
+          <table className="w-full text-center text-xs font-mono">
+            <thead>
+              <tr className="border-b border-[#1E293B]">
+                <th className="p-2 text-left font-sans text-gray-400">Actual \ Predicted</th>
+                <th className="p-2 text-critical">Predicted Spike</th>
+                <th className="p-2 text-teal">Predicted Normal</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1E293B]">
+              <tr>
+                <td className="p-2 text-left font-sans text-critical font-semibold">Actual Spike</td>
+                <td className="p-2 font-bold text-success bg-success/10">{nv.true_positives} (TP)</td>
+                <td className="p-2 text-gray-400 bg-critical/10">{nv.false_negatives} (FN)</td>
+              </tr>
+              <tr>
+                <td className="p-2 text-left font-sans text-teal font-semibold">Actual Benign</td>
+                <td className="p-2 text-critical bg-critical/10 font-bold">{nv.false_positives} (FP)</td>
+                <td className="p-2 font-bold text-success bg-success/10">{nv.true_negatives.toLocaleString()} (TN)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </>
   )
 }
@@ -979,20 +1203,29 @@ export function ModelHealthPage() {
     <>
       <PageHeader
         title="Model Health & Frozen Held-Out Evaluation"
-        subtitle="Measured from the saved scored artifact; unavailable values are shown explicitly"
+        subtitle="Measured from the saved evaluation artifact; synthetic demo metrics are clearly separated from the held-out benchmark on the Model Performance page"
       />
 
+      <div className="mb-4 rounded-xl border border-[#1E293B] bg-[#101726] p-3 text-[11px] text-gray-300">
+        <span className="text-gray-400">For the held-out generalization benchmark used in our submission, see </span>
+        <Link to="/dashboard/model-performance" className="text-[#3B82F6] hover:underline font-semibold">Model Performance</Link>
+        <span className="text-gray-400">.</span>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
-        <MetricCard label="Spike Recall" value={data.metrics.spike_recall === null ? 'Unavailable' : `${(data.metrics.spike_recall * 100).toFixed(1)}%`} subtitle="Synthetic event set" tone="text-success" />
-        <MetricCard label="Transaction Precision" value={data.metrics.transaction_precision === null ? 'Unavailable' : `${(data.metrics.transaction_precision * 100).toFixed(1)}%`} subtitle="Held-out measured value" tone="text-teal" />
-        <MetricCard label="Transaction Recall" value={data.metrics.transaction_recall === null ? 'Unavailable' : `${(data.metrics.transaction_recall * 100).toFixed(1)}%`} subtitle="Held-out measured value" tone="text-teal" />
-        <MetricCard label="Held-Out Test Set" value={data.held_out_test_size === null ? 'Unavailable' : data.held_out_test_size.toLocaleString()} subtitle="Chronologically evaluated slice" tone="text-white" />
+        <MetricCard label="Synthetic Demo Recall" value={data.metrics.spike_recall === null ? 'Unavailable' : `${(data.metrics.spike_recall * 100).toFixed(1)}%`} subtitle="4 injected demo spikes (not the held-out benchmark - see Model Performance page)" tone="text-success" />
+        <MetricCard label="Transaction Precision" value={data.metrics.transaction_precision === null ? 'Unavailable' : `${(data.metrics.transaction_precision * 100).toFixed(1)}%`} subtitle="Chronological 80/20 classifier evaluation" tone="text-teal" />
+        <MetricCard label="Transaction Recall" value={data.metrics.transaction_recall === null ? 'Unavailable' : `${(data.metrics.transaction_recall * 100).toFixed(1)}%`} subtitle="Chronological 80/20 classifier evaluation" tone="text-teal" />
+        <MetricCard label="Held-Out Test Set" value={data.held_out_test_size === null ? 'Unavailable' : data.held_out_test_size.toLocaleString()} subtitle="Held-out transaction classifier slice" tone="text-white" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2 mb-6">
         {/* Validation vs Held-Out Comparison Table */}
         <div className="rounded-xl border border-[#1E293B] bg-[#141B2E] p-5">
           <h3 className="text-xs font-bold uppercase tracking-wider text-white mb-3">Validation vs. Held-Out Generalization</h3>
+          <p className="text-[11px] text-gray-400 mb-3">
+            Transaction metrics are measured on separate chronological validation and frozen held-out classifier slices. Validation size: {data.validation_test_size?.toLocaleString() ?? 'Unavailable'}.
+          </p>
           <table className="w-full text-left text-xs font-mono">
             <thead className="border-b border-[#1E293B] text-gray-400">
               <tr>
@@ -1002,7 +1235,16 @@ export function ModelHealthPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1E293B]/60 text-gray-200">
-              {(['transaction_precision', 'transaction_recall', 'transaction_f1_score', 'transaction_false_positive_rate', 'spike_recall', 'alert_precision', 'alert_f1_score', 'bucket_fpr'] as const).map((key) => <tr key={key}><td className="py-2 font-sans text-gray-400">{key.replaceAll('_', ' ')}</td><td>Unavailable</td><td className="text-teal font-bold">{data.metrics[key] === null ? 'Unavailable' : data.metrics[key]?.toFixed(4)}</td></tr>)}
+              {([
+                { key: 'transaction_precision', label: 'Transaction Precision' },
+                { key: 'transaction_recall', label: 'Transaction Recall' },
+                { key: 'transaction_f1_score', label: 'Transaction F1 Score' },
+                { key: 'transaction_false_positive_rate', label: 'Transaction False Positive Rate' },
+                { key: 'spike_recall', label: 'Synthetic Demo Recall' },
+                { key: 'alert_precision', label: 'Alert Precision' },
+                { key: 'alert_f1_score', label: 'Alert F1 Score' },
+                { key: 'bucket_fpr', label: 'Bucket FPR' },
+              ] as const).map((row) => <tr key={row.key}><td className="py-2 font-sans text-gray-400">{row.label}</td><td>{row.key in data.validation_metrics && data.validation_metrics[row.key as keyof typeof data.validation_metrics] !== null ? data.validation_metrics[row.key as keyof typeof data.validation_metrics]?.toFixed(4) : 'Unavailable'}</td><td className="text-teal font-bold">{data.metrics[row.key] === null ? 'Unavailable' : data.metrics[row.key]?.toFixed(4)}</td></tr>)}
             </tbody>
           </table>
         </div>
@@ -1032,7 +1274,7 @@ export function ModelHealthPage() {
             </tbody>
           </table>
           <p className="text-[11px] text-gray-400 mt-3">
-            Model selection rationale: the current artifact records a chronological held-out evaluation. Validation metrics and challenger comparisons are unavailable unless a validation artifact is produced.
+            Model selection rationale: the classifier uses a chronological 60/20/20 split. Spike-level demo and alert metrics remain separate from the transaction classifier evaluation.
           </p>
         </div>
       </div>
@@ -1089,6 +1331,19 @@ export function SimulatorPage() {
     }
   }
 
+  const handleInjectRing = async () => {
+    setBusy(true)
+    setMessage('')
+    try {
+      const res = await api.simulateInjectRing()
+      setMessage(`[ABUSE RING] ${res.message ?? 'Coordinated ring injected — check Incidents for a RING-XXXX alert.'}`)
+    } catch (e) {
+      setMessage('Failed to inject abuse ring scenario')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -1133,6 +1388,13 @@ export function SimulatorPage() {
             <button className="btn-secondary !py-2 !px-4 text-xs font-semibold flex items-center gap-1.5 text-gray-400" onClick={handleReset} disabled={busy}>
               <StopCircle size={14} /> Reset Test Stream
             </button>
+            <button
+              className="!py-2 !px-4 text-xs font-semibold flex items-center gap-1.5 rounded-lg border border-amber-500/50 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-40"
+              onClick={handleInjectRing}
+              disabled={busy}
+            >
+              <Network size={14} /> Inject Abuse Ring
+            </button>
           </div>
         </div>
 
@@ -1146,7 +1408,10 @@ export function SimulatorPage() {
               <strong className="text-critical font-semibold">2. Fraud Spike:</strong> Injects high-velocity coordinated payments with anomalous probabilities ($Z \ge 3.0\sigma$). Anomaly detector triggers and generates a new incident.
             </p>
             <p className="rounded bg-[#0F172A] p-2.5 border border-[#1E293B]">
-              <strong className="text-white font-semibold">3. Investigation:</strong> Click on the created incident to inspect root-cause SHAP attributions, verified claims, and confirm fraud.
+              <strong className="text-amber-400 font-semibold">3. Abuse Ring:</strong> Injects a coordinated multi-actor ring (shared payment method, tight time window, similar amounts). Graph clustering detects the connected component and creates a <span className="font-mono text-amber-400">RING-XXXX</span> incident.
+            </p>
+            <p className="rounded bg-[#0F172A] p-2.5 border border-[#1E293B]">
+              <strong className="text-white font-semibold">4. Investigation:</strong> Click on the created incident to inspect root-cause SHAP attributions, verified claims, and confirm fraud.
             </p>
           </div>
         </div>

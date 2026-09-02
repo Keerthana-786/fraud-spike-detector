@@ -7,7 +7,7 @@ const links = [
   { to: '/', label: 'Home' },
   { to: '/#how-it-works', label: 'How It Works' },
   { to: '/#features', label: 'Features' },
-  { to: '/docs', label: 'Docs' },
+  { to: '/dashboard', label: 'Dashboard' },
   { to: '/#pricing', label: 'Pricing' },
 ]
 
@@ -25,11 +25,11 @@ export function MarketingNav() {
           ))}
         </nav>
         <div className="hidden items-center gap-3 md:flex">
-          <NavLink to="/login" className="btn-outline !py-2 !text-sm">
-            Login
+          <NavLink to="/dashboard" className="btn-outline !py-2 !text-sm">
+            Open Dashboard
           </NavLink>
-          <Link to="/signup" className="btn-primary !py-2 !text-sm">
-            Get Started
+          <Link to="/login" className="btn-primary !py-2 !text-sm">
+            Login
           </Link>
         </div>
         <button type="button" className="md:hidden" onClick={() => setOpen((v) => !v)} aria-label="Menu">
@@ -43,11 +43,11 @@ export function MarketingNav() {
               {l.label}
             </a>
           ))}
-          <Link to="/login" className="block py-1 text-sm" onClick={() => setOpen(false)}>
-            Login
+          <Link to="/dashboard" className="block py-1 text-sm" onClick={() => setOpen(false)}>
+            Open Dashboard
           </Link>
-          <Link to="/signup" className="btn-primary mt-2 w-full" onClick={() => setOpen(false)}>
-            Get Started
+          <Link to="/login" className="btn-primary mt-2 w-full" onClick={() => setOpen(false)}>
+            Login
           </Link>
         </div>
       )}

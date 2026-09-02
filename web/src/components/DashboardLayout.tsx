@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   Bell,
   Cpu,
   CreditCard,
@@ -56,6 +57,7 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/dashboard/simulator', label: 'Pipeline Simulator', icon: Zap },
       { to: '/dashboard/razorpay', label: 'Razorpay Test Mode', icon: Radio },
+      { to: '/dashboard/model-performance', label: 'Model Performance', icon: BarChart3 },
       { to: '/dashboard/model-health', label: 'Model Health', icon: Cpu },
     ],
   },

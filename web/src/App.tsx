@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './lib/auth'
 import { LoginPage, SignupPage, ForgotPasswordPage } from './pages/Auth'
 import { DashboardLayout } from './components/DashboardLayout'
+import { LandingPage } from './pages/Landing'
 import {
   DashboardHome,
   TransactionsPage,
@@ -10,6 +11,7 @@ import {
   AlertDetailPage,
   FinancialImpactPage,
   ModelHealthPage,
+  ModelPerformancePage,
   SimulatorPage,
   RazorpayIntegrationPage,
   NotificationsPage,
@@ -25,10 +27,11 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          
+
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<DashboardHome />} />
             
@@ -48,6 +51,7 @@ function App() {
             {/* Configure */}
             <Route path="simulator" element={<SimulatorPage />} />
             <Route path="razorpay" element={<RazorpayIntegrationPage />} />
+            <Route path="model-performance" element={<ModelPerformancePage />} />
             <Route path="model-health" element={<ModelHealthPage />} />
 
             {/* Manage */}
@@ -59,8 +63,7 @@ function App() {
             <Route path="docs" element={<DocsPage />} />
           </Route>
 
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

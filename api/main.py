@@ -38,6 +38,7 @@ from src.ai_investigator import (
 from src.live_store import LiveStore
 from src.razorpay_service import create_test_order, verify_payment_signature
 from src.test_simulator import (
+    inject_abuse_ring,
     inject_controlled_spike,
     start_test_stream,
     stop_simulation,
@@ -667,6 +668,7 @@ def model_health() -> dict:
 
     model_exists = LIVE_MODEL_PATH.exists()
     measured = (evaluation_data or {}).get("transaction_classifier", {})
+    validation = measured.get("validation", {})
     metrics = {
         "transaction_precision": measured.get("precision"),
         "transaction_recall": measured.get("recall"),
@@ -682,8 +684,15 @@ def model_health() -> dict:
         "model_version": "1.0.0-prod",
         "model_status": "ready" if model_exists else "not_trained",
         "evaluation_status": measured.get("status", "UNAVAILABLE"),
-        "evaluation_method": "Chronological Held-out Test Split (PaySim Benchmark)",
+        "evaluation_method": measured.get("method", "Chronological Held-out Test Split (PaySim Benchmark)"),
         "held_out_test_size": measured.get("held_out_test_size"),
+        "validation_test_size": validation.get("validation_size"),
+        "validation_metrics": {
+            "transaction_precision": validation.get("precision"),
+            "transaction_recall": validation.get("recall"),
+            "transaction_f1_score": validation.get("f1"),
+            "transaction_false_positive_rate": validation.get("false_positive_rate"),
+        },
         "metrics": metrics,
         "confusion_matrix": measured.get("confusion_matrix"),
         "feature_importances": [],
@@ -745,12 +754,26 @@ def simulate_razorpay_webhook(
     }
 
 
+@app.get("/api/model/performance")
+def model_performance() -> dict:
+    perf_path = PROJECT_ROOT / "data" / "model_evaluation_results.json"
+    if perf_path.exists():
+        try:
+            with open(perf_path) as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error("Error reading model_evaluation_results.json: %s", e)
+    
+    # Fallback if file not yet generated
+    from scripts.evaluate import evaluate_benchmark
+    return evaluate_benchmark()
+
+
 # -----------------------------------------------------------------------------
 # Controlled Test Simulator Endpoints
 # -----------------------------------------------------------------------------
 @app.post("/api/simulator/normal")
 def simulate_normal_traffic(count: int = 5) -> dict:
-    # Clear previous simulation data to ensure demo runs start from a clean state
     store.clear_simulator_data()
     results = start_test_stream(count=count, store=store)
     return {
@@ -762,7 +785,6 @@ def simulate_normal_traffic(count: int = 5) -> dict:
 
 @app.post("/api/simulator/spike")
 def simulate_fraud_spike() -> dict:
-    # Ensure previous simulation data is cleared to avoid stale alerts or buckets
     store.clear_simulator_data()
     results = inject_controlled_spike(store=store)
     alerts = store.list_alerts(limit=5)
@@ -771,6 +793,19 @@ def simulate_fraud_spike() -> dict:
         "events_processed": len(results),
         "active_alerts": alerts,
         "message": "Injected historical baseline and high-risk surge. Fraud spike triggered.",
+    }
+
+
+@app.post("/api/simulator/inject-ring")
+def simulate_abuse_ring() -> dict:
+    store.clear_simulator_data()
+    results = inject_abuse_ring(store=store)
+    alerts = store.list_alerts(limit=5)
+    return {
+        "status": "completed",
+        "events_processed": len(results),
+        "active_alerts": alerts,
+        "message": "Injected coordinated abuse ring burst. Graph connected components generated RING incident.",
     }
 
 

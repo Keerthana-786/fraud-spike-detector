@@ -57,7 +57,7 @@ def train_and_score(
     input_path: Path,
     output_path: Path,
     model_path: Path,
-    train_ratio: float = 0.8,
+    train_ratio: float = 0.6,
     scale_pos_weight: float = 10.0,
 ) -> tuple[XGBClassifier, pd.DataFrame]:
     """Train XGBoost on chronological train split, evaluate on test split, score dataset."""
@@ -72,18 +72,23 @@ def train_and_score(
     features, timestamps = build_features(df)
     print(f"Features engineered: {list(features.columns)}")
 
-    # Time-based train / test split
+    # Time-based train / validation / held-out test split
     time_sorted_idx = timestamps.sort_values(kind="stable").index
-    split_idx = int(n_rows * train_ratio)
-    train_indices = time_sorted_idx[:split_idx]
-    test_indices = time_sorted_idx[split_idx:]
+    train_end = int(n_rows * train_ratio)
+    validation_end = int(n_rows * (train_ratio + 0.2))
+    train_indices = time_sorted_idx[:train_end]
+    validation_indices = time_sorted_idx[train_end:validation_end]
+    test_indices = time_sorted_idx[validation_end:]
 
-    print(f"\nTime-Based Split ({int(train_ratio*100)}/{int((1-train_ratio)*100)}):")
+    print(f"\nTime-Based Split ({int(train_ratio*100)}/20/20):")
     print(f"Train transactions: {len(train_indices):,} (Range: {timestamps.loc[train_indices].min()} to {timestamps.loc[train_indices].max()})")
+    print(f"Validation transactions: {len(validation_indices):,} (Range: {timestamps.loc[validation_indices].min()} to {timestamps.loc[validation_indices].max()})")
     print(f"Test transactions:  {len(test_indices):,} (Range: {timestamps.loc[test_indices].min()} to {timestamps.loc[test_indices].max()})")
 
     X_train = features.loc[train_indices]
     y_train = df.loc[train_indices, "isFraud"]
+    X_validation = features.loc[validation_indices]
+    y_validation = df.loc[validation_indices, "isFraud"]
     X_test = features.loc[test_indices]
     y_test = df.loc[test_indices, "isFraud"]
 
@@ -111,7 +116,15 @@ def train_and_score(
     model.fit(X_train, y_train)
     print("XGBoost training complete.")
 
-    # Evaluate on holdout test set
+    # Evaluate on validation and final held-out test sets
+    print("\n--- Validation Set Evaluation ---")
+    validation_probs = model.predict_proba(X_validation)[:, 1]
+    validation_preds = (validation_probs >= 0.5).astype(int)
+    print(f"Precision: {precision_score(y_validation, validation_preds, zero_division=0):.4f}")
+    print(f"Recall:    {recall_score(y_validation, validation_preds, zero_division=0):.4f}")
+    print(f"F1 Score:  {f1_score(y_validation, validation_preds, zero_division=0):.4f}")
+
+    # Final held-out test set evaluation
     print("\n--- Test Set Evaluation ---")
     test_probs = model.predict_proba(X_test)[:, 1]
     test_preds = (test_probs >= 0.5).astype(int)
@@ -155,7 +168,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input", type=Path, default=DEFAULT_INPUT_PATH)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     parser.add_argument("--model", type=Path, default=DEFAULT_MODEL_PATH)
-    parser.add_argument("--train-ratio", type=float, default=0.8)
+    parser.add_argument("--train-ratio", type=float, default=0.6)
     parser.add_argument("--scale-pos-weight", type=float, default=10.0)
     return parser.parse_args()
 
